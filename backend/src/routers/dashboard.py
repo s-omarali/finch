@@ -9,7 +9,6 @@ from backend.src.routers.deps import get_auth_user
 
 router = APIRouter(prefix="/api/v1", tags=["dashboard"])
 
-
 @router.get("/dashboard")
 def get_dashboard(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     auth_user = get_auth_user(authorization)

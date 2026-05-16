@@ -81,7 +81,11 @@ export async function getCurrentUser(): Promise<UserProfile> {
     onboardingCompleted: data.onboarding_completed ?? false,
   };
 }
-
+export async function getPlaidTestUserData(): Promise<DashboardResponse>
+{
+  const resp = await apiFetch<DashboardResponse>("/api/v1/plaid-test-dashboard");
+  return resp;
+}
 export async function getDashboardData(): Promise<DashboardResponse> {
   const real = await apiFetch<DashboardResponse>("/api/v1/dashboard");
 
