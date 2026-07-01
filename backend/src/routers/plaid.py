@@ -63,7 +63,7 @@ def classify_transaction(merchant: str, amount: float, detailed_category: str) -
         return "Meals", "Meals may be partially deductible"
     if any(token in text for token in ["office", "supplies", "best buy", "staples"]):
         return "Supplies", "Business supplies may be deductible"
-    return "Uncategorized", "Needs manual review"
+    return " ", "Needs manual review"
 
 
 def upsert_transactions(user_id: str, added: list[dict[str, Any]]) -> int:
