@@ -22,7 +22,7 @@ import type {
 } from "../types/api";
 import type { FilingProfile, FilingRun, IntegrationConnection, UserProfile } from "../types/domain";
 
-const DEFAULT_BASE_URL = "https://hackmsa-2026-production.up.railway.app";
+const DEFAULT_BASE_URL = "https://api.finch-tax.com";
 
 function resolveApiBaseUrl(): string {
   const configured = (import.meta.env.VITE_API_BASE_URL ?? "").trim();
