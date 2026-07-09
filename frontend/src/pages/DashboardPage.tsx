@@ -11,7 +11,7 @@ import { MetricCard } from "../components/dashboard/MetricCard";
 import { EmptyState } from "../components/state/EmptyState";
 import { LoadingState } from "../components/state/LoadingState";
 import { useOptimizationReview } from "../context/OptimizationReviewContext";
-import { getCurrentUser, getDashboardData } from "../services/api";
+import { getCurrentUser, getDashboardData, getPlaidTestUserData } from "../services/api";
 import type { DashboardResponse } from "../types/api";
 import type { UserProfile } from "../types/domain";
 import {
@@ -29,6 +29,7 @@ export function DashboardPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isSandboxPreview, setIsSandboxPreview] = useState(false);
 
   const mergedOptimizationSignals = useMemo(
     () => mergeOptimizationCompletion(dashboard?.optimizationSignals ?? [], completedIds, dismissedIds),
@@ -53,6 +54,26 @@ export function DashboardPage() {
         transactions: prev.transactions.filter((t) => t.id !== id),
       };
     });
+  }
+
+  async function handlePreviewSandbox() {
+    setIsLoading(true);
+    setLoadError(null);
+
+    try {
+      const [dash, profile] = await Promise.all([
+        getPlaidTestUserData(),
+        getCurrentUser(),
+      ]);
+
+      setDashboard(dash);
+      setUser(profile);
+      setIsSandboxPreview(true);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load Plaid preview.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -111,6 +132,11 @@ if (isLoading) {
     return <LoadingState title="Dashboard" description="Running the numbers…" />;
   }
 
+  const firstName = user?.fullName?.split(" ")[0] ?? "Creator";
+  const bracketPct = user?.estimatedMarginalTaxRate
+    ? `${(user.estimatedMarginalTaxRate * 100).toFixed(0)}%`
+    : "";
+
   if (loadError) {
     return <EmptyState title="Dashboard data unavailable" description={loadError} />;
   }
@@ -123,12 +149,6 @@ if (isLoading) {
       />
     );
   }
-
-  const firstName = user?.fullName?.split(" ")[0] ?? "Creator";
-  const bracketPct = user?.estimatedMarginalTaxRate
-    ? `${(user.estimatedMarginalTaxRate * 100).toFixed(0)}%`
-    : "";
-
   return (
     <div className="space-y-6">
 
@@ -136,7 +156,7 @@ if (isLoading) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-extrabold tracking-[0.12em] uppercase mb-1" style={{ color: "rgba(0,255,133,0.75)" }}>
-            Tax overview
+            {isSandboxPreview ? "Plaid sandbox preview" : "Tax overview"}
           </p>
           <h1 className="text-[1.75rem] font-extrabold text-[#EDEDED] leading-tight">
             Hey {firstName} — here&apos;s where you stand.
@@ -153,6 +173,7 @@ if (isLoading) {
             </>
           ) : null}
         </div>
+        <div className="flex flex-wrap gap-3 self-start">
         <a
           href="/filing-prep"
           className="hidden md:inline-flex flex-shrink-0 items-center justify-center gap-2 self-start rounded-xl px-4 py-2.5 text-[13px] font-extrabold transition-all duration-150 whitespace-nowrap"
@@ -167,6 +188,33 @@ if (isLoading) {
         >
           Filing prep →
         </a>
+
+        <a
+          href="/filing-prep"
+          className="hidden md:inline-flex flex-shrink-0 items-center justify-center gap-2 self-start rounded-xl px-4 py-2.5 text-[13px] font-extrabold transition-all duration-150 whitespace-nowrap"
+          style={{
+            background: "rgba(59,130,246,0.14)",
+            border: "1px solid rgba(59,130,246,0.35)",
+            color: "#3B82F6",
+            boxShadow: "0 0 22px rgba(59,130,246,0.12)",
+          }}
+        >
+          Filing prep →
+        </a>
+
+        <button
+          type="button"
+          onClick={() => void handlePreviewSandbox()}
+          className="hidden md:inline-flex flex-shrink-0 items-center justify-center gap-2 self-start rounded-xl px-4 py-2.5 text-[13px] font-extrabold transition-all duration-150 whitespace-nowrap"
+          style={{
+            background: isSandboxPreview ? "rgba(0,255,133,0.14)" : "rgba(255,255,255,0.05)",
+            border: isSandboxPreview ? "1px solid rgba(0,255,133,0.28)" : "1px solid rgba(255,255,255,0.08)",
+            color: isSandboxPreview ? "#00FF85" : "#EDEDED",
+          }}
+        >
+          Preview Plaid sandbox
+        </button>
+      </div>
       </div>
 
       {/* ── HERO — Money we saved you ───────────────────────────────── */}

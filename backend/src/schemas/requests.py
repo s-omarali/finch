@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class OnboardingPayload(BaseModel):
     gigs: list[str]
     integrations: list[dict[str, Any]]
+    subscriptions: list[str]
 
 
 class ReceiptScanPayload(BaseModel):

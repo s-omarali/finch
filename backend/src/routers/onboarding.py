@@ -28,6 +28,7 @@ def save_onboarding(
         "state": "TX",
         "estimated_marginal_tax_rate": 0.24,
         "onboarding_completed": True,
+        "subscriptions": payload.subscriptions
     }).execute()
 
     for integration in payload.integrations:
