@@ -10,40 +10,46 @@ from backend.db import get_supabase
 from backend.src.routers.deps import get_user_id
 
 router = APIRouter(prefix="/api/v1", tags=["plaid"])
+from dotenv import load_dotenv
+from pathlib import Path
+from datetime import date
+import json
 
+import plaid
+from time import sleep
+from plaid.api import plaid_api
+from plaid.model.sandbox_public_token_create_request import SandboxPublicTokenCreateRequest
+from plaid.model.sandbox_public_token_create_request_options import SandboxPublicTokenCreateRequestOptions
+from plaid.model.transactions_sync_request import TransactionsSyncRequest
+from plaid.model.transactions_get_request import TransactionsGetRequest
+from plaid.model.transactions_refresh_request import TransactionsRefreshRequest
+from plaid.model.products import Products
+from plaid.model.sandbox_public_token_create_request_options import SandboxPublicTokenCreateRequestOptions
+from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
 
-def _plaid_client() -> Any:
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[2]/ "env")
+plaid_secret = os.getenv("PLAID_ENV")
+plaid_client_key = os.getenv("PLAID_CLIENT")
+
+def plaid_client() -> Any:
     try:
-        import plaid
-        from plaid.api import plaid_api
-    except ImportError as exc:
-        raise HTTPException(
-            status_code=500,
-            detail="plaid-python is not installed. Run 'uv sync' from repository root.",
-        ) from exc
+        configuration = plaid.Configuration(
+            host=plaid.Environment.Sandbox,
+            api_key={
+                'clientId': plaid_client_key,
+                'secret': plaid_secret,
+            }
+        )
 
-    client_id = os.getenv("PLAID_CLIENT_ID", "") or os.getenv("PLAID_CLIENT", "")
-    secret = os.getenv("PLAID_SECRET", "")
-    env = os.getenv("PLAID_ENV", "sandbox").lower()
+        api_client = plaid.ApiClient(configuration)
+        client = plaid_api.PlaidApi(api_client)
+        print("Successful connection")
+    
+    except plaid.ApiException as e:
+        print(e)
+    return client
 
-    if not client_id or not secret:
-        raise HTTPException(status_code=500, detail="PLAID_CLIENT_ID (or PLAID_CLIENT) and PLAID_SECRET must be set in backend/.env")
-
-    host = {
-        "sandbox": plaid.Environment.Sandbox,
-        "development": plaid.Environment.Development,
-        "production": plaid.Environment.Production,
-    }.get(env, plaid.Environment.Sandbox)
-
-    configuration = plaid.Configuration(
-        host=host,
-        api_key={"clientId": client_id, "secret": secret},
-    )
-    api_client = plaid.ApiClient(configuration)
-    return plaid_api.PlaidApi(api_client)
-
-
-def _classify_transaction(merchant: str, amount: float, detailed_category: str) -> tuple[str, str]:
+def classify_transaction(merchant: str, amount: float, detailed_category: str) -> tuple[str, str]:
     text = f"{merchant} {detailed_category}".lower()
     if amount < 0:
         return "Income", "Likely payout or incoming transfer"
@@ -57,10 +63,10 @@ def _classify_transaction(merchant: str, amount: float, detailed_category: str) 
         return "Meals", "Meals may be partially deductible"
     if any(token in text for token in ["office", "supplies", "best buy", "staples"]):
         return "Supplies", "Business supplies may be deductible"
-    return "Uncategorized", "Needs manual review"
+    return " ", "Needs manual review"
 
 
-def _upsert_transactions(user_id: str, added: list[dict[str, Any]]) -> int:
+def upsert_transactions(user_id: str, added: list[dict[str, Any]]) -> int:
     sb = get_supabase()
     inserted = 0
     for tx in added:
@@ -72,7 +78,7 @@ def _upsert_transactions(user_id: str, added: list[dict[str, Any]]) -> int:
             tx.get("personal_finance_category", {}).get("detailed")
             or (tx.get("category", [""])[0] if tx.get("category") else "")
         )
-        category, reason = _classify_transaction(merchant, amount, detailed_category)
+        category, reason = classify_transaction(merchant, amount, detailed_category)
         tx_type = "income" if amount < 0 else "expense"
 
         sb.table("transactions").upsert({
@@ -90,7 +96,93 @@ def _upsert_transactions(user_id: str, added: list[dict[str, Any]]) -> int:
         inserted += 1
     return inserted
 
+@router.get("/plaid-test-dashboard")
+def get_plaid_test_user() -> dict[str, Any]:
+    client = plaid_client()
+    # create public token    
+    pt_request = SandboxPublicTokenCreateRequest(
+        institution_id='ins_109508',
+        initial_products=[Products('transactions')],
+        options=SandboxPublicTokenCreateRequestOptions(
+        override_username='custom_user1',),
+    )
 
+    pt_response = client.sandbox_public_token_create(pt_request)
+    public_token = pt_response['public_token']
+
+    # exchange for access token
+    exchange_request = ItemPublicTokenExchangeRequest(
+        public_token=public_token
+    )
+
+    exchange_response = client.item_public_token_exchange(exchange_request)
+    access_token = exchange_response['access_token']
+    client.transactions_refresh(TransactionsRefreshRequest(access_token=access_token))
+    print(f"Access Token: {access_token}")
+
+    sleep(3) # wait
+
+    get_request = TransactionsGetRequest(
+        access_token=access_token,
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 5, 1),  # or date.today()
+    )
+    sync_request = TransactionsSyncRequest(access_token=access_token)
+    sync_response = client.transactions_sync(sync_request)
+    get_response = client.transactions_get(get_request).to_dict()
+
+    added_transactions = sync_response.get('added', [])
+    dashboard_data = {
+        "income": [txn for txn in added_transactions if txn.get('amount') < 0],
+        "expenses": [txn for txn in added_transactions if txn.get('amount') >= 0]
+    }
+
+    # return dashboard_data
+    transactions: list[dict[str, Any]] = []
+    next_cursor: str | None = None
+    has_more = True
+    while has_more:
+        if next_cursor is not None:
+            sync_request = TransactionsSyncRequest(access_token=access_token, cursor=next_cursor)
+
+        sync_response = client.transactions_sync(sync_request).to_dict()
+
+        for tx in sync_response.get("added", []):
+            amount = float(tx.get("amount", 0.0))
+            merchant = str(tx.get("merchant_name") or tx.get("name") or "Unknown")
+            detailed_category = str(
+                tx.get("personal_finance_category", {}).get("detailed")
+                or (tx.get("category", [""])[0] if tx.get("category") else "")
+            )
+            category, reason = classify_transaction(merchant, amount, detailed_category)
+
+            transactions.append({
+                "id": str(tx.get("transaction_id")),
+                "date": str(tx.get("date")),
+                "merchant": merchant,
+                "amount": abs(amount),
+                "type": "income" if amount < 0 else "expense",
+                "category": category,
+                "confidenceScore": 0.9 if category != "Uncategorized" else 0.65,
+                "source": "bank",
+                "notes": reason,
+            })
+
+        next_cursor = sync_response.get("next_cursor")
+        has_more = bool(sync_response.get("has_more", False))
+    total_income = round(sum(t["amount"] for t in transactions if t["type"] == "income"), 2)
+    
+    return {
+        "metrics": {
+            "totalIncome": total_income,
+            "estimatedTaxLiability": round(total_income * 0.24, 2),
+            "totalDeductionsFound": 0,
+        },
+        "transactions": transactions,
+        "deductions": [],
+        "optimizationSignals": [],
+    }
+    
 @router.get("/integrations/defaults")
 def integration_defaults() -> list[dict[str, Any]]:
     return [
@@ -120,7 +212,7 @@ def plaid_link_token(
         ) from exc
 
     user_id = get_user_id(authorization)
-    client = _plaid_client()
+    client = plaid_client()
     request = LinkTokenCreateRequest(
         products=[Products("transactions")],
         client_name="GigATax",
@@ -146,7 +238,7 @@ def plaid_exchange(
         ) from exc
 
     user_id = get_user_id(authorization)
-    client = _plaid_client()
+    client = plaid_client()
     public_token = str(payload.get("public_token", ""))
     if not public_token:
         raise HTTPException(status_code=400, detail="public_token is required")
@@ -199,7 +291,7 @@ def plaid_sync_all(authorization: str | None = Header(default=None)) -> dict[str
         or []
     )
 
-    client = _plaid_client()
+    client = plaid_client()
     synced_item_ids: list[str] = []
     total_added = 0
 
@@ -216,7 +308,7 @@ def plaid_sync_all(authorization: str | None = Header(default=None)) -> dict[str
                 TransactionsSyncRequest(access_token=access_token, cursor=cursor)
             ).to_dict()
             added = sync_response.get("added", [])
-            total_added += _upsert_transactions(user_id, added)
+            total_added += upsert_transactions(user_id, added)
             cursor = sync_response.get("next_cursor")
             has_more = bool(sync_response.get("has_more", False))
 
