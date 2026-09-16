@@ -20,17 +20,11 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePlaidLink } from "react-plaid-link";
 import { useNavigate } from "react-router-dom";
 import { GigaTaxWordmark } from "../components/branding/GigaTaxWordmark";
 import { estimateAnnualIncomeFromGigs, gigOptions, mockIntegrations } from "../data/mockData";
-import {
-  createPlaidLinkToken,
-  exchangePlaidPublicToken,
-  getIntegrationDefaults,
-  saveOnboarding,
-  syncAllPlaidTransactions,
-} from "../services/api";
+import { usePlaidConnect } from "../hooks/usePlaidConnect";
+import { getIntegrations, saveOnboarding } from "../services/api";
 import { auth, supabase } from "../services/supabaseClient";
 import type { IntegrationConnection, UserProfile } from "../types/domain";
 
@@ -190,8 +184,6 @@ export function OnboardingPage() {
   }, [step]);
 
   // Step 5 — connect
-  const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
-  const [isPlaidConnecting, setIsPlaidConnecting] = useState(false);
   const [integrations, setIntegrations] = useState<IntegrationConnection[]>(() => cloneMockIntegrations());
   const [integrationsExpanded, setIntegrationsExpanded] = useState(false);
   const INTEGRATIONS_PREVIEW = 3;
@@ -216,7 +208,7 @@ export function OnboardingPage() {
     let active = true;
     async function load() {
       try {
-        const defaults = await getIntegrationDefaults();
+        const defaults = await getIntegrations();
         if (!active) return;
         setIntegrations(mergeIntegrationDefaults(defaults));
       } catch {
@@ -263,10 +255,7 @@ export function OnboardingPage() {
     }
   }
 
-  const onPlaidSuccess = useCallback(async (publicToken: string) => {
-    await exchangePlaidPublicToken({ public_token: publicToken });
-    await syncAllPlaidTransactions();
-
+  const onPlaidConnected = useCallback(() => {
     setIntegrations((prev) =>
       prev.map((integration) =>
         integration.id === "bank"
@@ -274,25 +263,9 @@ export function OnboardingPage() {
           : integration
       )
     );
-
-    setIsPlaidConnecting(false);
-    setPlaidLinkToken(null);
   }, []);
 
-  const { open: openPlaid, ready: plaidReady } = usePlaidLink({
-    token: plaidLinkToken,
-    onSuccess: (publicToken) => {
-      void onPlaidSuccess(publicToken);
-    },
-    onExit: () => {
-      setIsPlaidConnecting(false);
-    },
-  });
-
-  useEffect(() => {
-    if (!plaidLinkToken || !plaidReady || !isPlaidConnecting) return;
-    openPlaid();
-  }, [isPlaidConnecting, openPlaid, plaidLinkToken, plaidReady]);
+  const { startConnect: startPlaidConnect } = usePlaidConnect(onPlaidConnected);
 
   async function handleIntegrationConnect(integration: IntegrationConnection) {
     if (integration.id !== "bank") {
@@ -305,13 +278,7 @@ export function OnboardingPage() {
       return;
     }
 
-    try {
-      setIsPlaidConnecting(true);
-      const tokenResponse = await createPlaidLinkToken();
-      setPlaidLinkToken(tokenResponse.link_token);
-    } catch {
-      setIsPlaidConnecting(false);
-    }
+    await startPlaidConnect();
   }
 
   // ── 1099 upload logic ─────────────────────────────────────────────────

@@ -38,6 +38,7 @@ export interface IntegrationConnection {
   description: string;
   connected: boolean;
   lastSyncAt?: string;
+  comingSoon?: boolean;
 }
 
 export interface UserProfile {

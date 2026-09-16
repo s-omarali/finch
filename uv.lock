@@ -603,6 +603,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "anthropic" },
+    { name = "cryptography" },
     { name = "fastapi" },
     { name = "google-generativeai" },
     { name = "plaid-python" },
@@ -615,6 +616,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=0.96.0" },
+    { name = "cryptography", specifier = ">=42.0.0" },
     { name = "fastapi", specifier = ">=0.136.0" },
     { name = "google-generativeai", specifier = ">=0.8.6" },
     { name = "plaid-python", specifier = ">=16.0.0" },

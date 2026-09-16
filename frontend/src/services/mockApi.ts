@@ -25,7 +25,7 @@ import type {
 } from "../types/api";
 import type { DashboardMetrics, FilingRun, IntegrationConnection, Transaction, UserProfile } from "../types/domain";
 import { API_ROUTES } from "../types/api";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "./supabaseClient";
 import { getStateTaxContext } from "../utils/stateTaxContext";
 import {
   estimateMilesFromGasSpend,
