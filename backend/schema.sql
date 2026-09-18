@@ -63,6 +63,19 @@ create table if not exists public.integrations (
   unique (user_id, integration_id)
 );
 
+-- Plaid items (encrypted access tokens, one row per linked bank connection)
+create table if not exists public.plaid_items (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  item_id text not null unique,
+  access_token_encrypted text not null,
+  institution_id text,
+  institution_name text,
+  sync_cursor text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 -- Optimization signals (e.g. vehicle mileage prompts)
 create table if not exists public.optimization_signals (
   id uuid primary key default gen_random_uuid(),
@@ -107,6 +120,7 @@ alter table public.transactions enable row level security;
 alter table public.deductions enable row level security;
 alter table public.receipts enable row level security;
 alter table public.integrations enable row level security;
+alter table public.plaid_items enable row level security;
 alter table public.optimization_signals enable row level security;
 alter table public.filing_profiles enable row level security;
 alter table public.filing_runs enable row level security;
@@ -117,6 +131,7 @@ create policy "transactions_self" on public.transactions for all using (auth.uid
 create policy "deductions_self" on public.deductions for all using (auth.uid() = user_id);
 create policy "receipts_self" on public.receipts for all using (auth.uid() = user_id);
 create policy "integrations_self" on public.integrations for all using (auth.uid() = user_id);
+create policy "plaid_items_self" on public.plaid_items for all using (auth.uid() = user_id);
 create policy "signals_self" on public.optimization_signals for all using (auth.uid() = user_id);
 create policy "filing_profiles_self" on public.filing_profiles for all using (auth.uid() = user_id);
 create policy "filing_runs_self" on public.filing_runs for all using (auth.uid() = user_id);

@@ -4,6 +4,7 @@ import {
   FileSpreadsheet,
   LogOut,
   ReceiptText,
+  Settings,
 } from "lucide-react";
 import { GigaTaxWordmark } from "../branding/GigaTaxWordmark";
 import { useEffect, useMemo, useState } from "react";
@@ -22,6 +23,7 @@ const navItems = [
   { to: "/receipts",     label: "Receipt Capture", icon: ReceiptText,  activeEmoji: "🧾" },
   { to: "/optimization", label: "Optimization",    icon: ClipboardList, activeEmoji: "⚡" },
   { to: "/filing-prep",  label: "Review and File", icon: FileSpreadsheet, activeEmoji: "✅" },
+  { to: "/settings",     label: "Settings",        icon: Settings,     activeEmoji: "⚙️" },
 ];
 
 export function AppShell() {

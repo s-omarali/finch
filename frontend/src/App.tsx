@@ -9,6 +9,7 @@ import { LandingPage } from "./pages/LandingPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { OptimizationPage } from "./pages/OptimizationPage";
 import { ReceiptCapturePage } from "./pages/ReceiptCapturePage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { WaitlistAccessPage } from "./pages/WaitlistAccessPage";
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
         <Route path="/optimization" element={<OptimizationPage />} />
         <Route path="/review" element={<FilingPrepPage />} />
         <Route path="/filing-prep" element={<FilingPrepPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

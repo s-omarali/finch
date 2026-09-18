@@ -7,18 +7,20 @@
 
 import { mockDeductions, mockOptimizationSignals, mockTransactions } from "../data/mockData";
 import { getAuthHeaders } from "./supabaseClient";
-import type {
-  DashboardResponse,
-  FilingPreparationPayload,
-  FilingRunStartPayload,
-  OnboardingPayload,
-  OptimizationMileagePayload,
-  OptimizationMileageResult,
-  PlaidExchangeRequest,
-  PlaidExchangeResponse,
-  PlaidLinkTokenResponse,
-  PlaidSyncResponse,
-  ReceiptScanResponse,
+import {
+  API_ROUTES,
+  type DashboardResponse,
+  type FilingPreparationPayload,
+  type FilingRunStartPayload,
+  type OnboardingPayload,
+  type OptimizationMileagePayload,
+  type OptimizationMileageResult,
+  type PlaidDisconnectResponse,
+  type PlaidExchangeRequest,
+  type PlaidExchangeResponse,
+  type PlaidLinkTokenResponse,
+  type PlaidSyncResponse,
+  type ReceiptScanResponse,
 } from "../types/api";
 import type { FilingProfile, FilingRun, IntegrationConnection, UserProfile } from "../types/domain";
 
@@ -187,23 +189,27 @@ export async function approveCurrentFilingStep(run: FilingRun): Promise<FilingRu
   };
 }
 
-export async function getIntegrationDefaults(): Promise<IntegrationConnection[]> {
-  return apiFetch<IntegrationConnection[]>("/api/v1/integrations/defaults");
+export async function getIntegrations(): Promise<IntegrationConnection[]> {
+  return apiFetch<IntegrationConnection[]>(API_ROUTES.integrations);
 }
 
 export async function createPlaidLinkToken(): Promise<PlaidLinkTokenResponse> {
-  return apiFetch<PlaidLinkTokenResponse>("/api/v1/plaid/link-token", { method: "POST" });
+  return apiFetch<PlaidLinkTokenResponse>(API_ROUTES.plaidLinkToken, { method: "POST" });
 }
 
 export async function exchangePlaidPublicToken(payload: PlaidExchangeRequest): Promise<PlaidExchangeResponse> {
-  return apiFetch<PlaidExchangeResponse>("/api/v1/plaid/exchange", {
+  return apiFetch<PlaidExchangeResponse>(API_ROUTES.plaidExchange, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export async function syncAllPlaidTransactions(): Promise<PlaidSyncResponse> {
-  return apiFetch<PlaidSyncResponse>("/api/v1/plaid/sync", { method: "POST" });
+  return apiFetch<PlaidSyncResponse>(API_ROUTES.plaidSyncAll, { method: "POST" });
+}
+
+export async function disconnectPlaid(): Promise<PlaidDisconnectResponse> {
+  return apiFetch<PlaidDisconnectResponse>(API_ROUTES.plaidDisconnect, { method: "POST" });
 }
 
 export async function joinWaitlist(email: string): Promise<{ message: string }> {

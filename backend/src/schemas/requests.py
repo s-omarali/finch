@@ -8,7 +8,9 @@ from pydantic import BaseModel
 class OnboardingPayload(BaseModel):
     gigs: list[str]
     integrations: list[dict[str, Any]]
-    subscriptions: list[str]
+    # Not every user has subscriptions to report, and there's no onboarding
+    # step yet that collects them — genuinely optional, defaults to empty.
+    subscriptions: list[str] = []
 
 
 class ReceiptScanPayload(BaseModel):
